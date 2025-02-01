@@ -11,7 +11,7 @@ class DashboardLayout:
         # If today is Friday (weekday 4), return today's date
         if from_date.weekday() == 4:
             return from_date
-            
+        
         # Get days until next Friday
         days_ahead = 4 - from_date.weekday()
         if days_ahead <= 0:  # If weekend
@@ -21,7 +21,7 @@ class DashboardLayout:
     @staticmethod
     def setup_page():
         """Setup basic page layout"""
-        st.title("Live GEX Dashboard")
+        st.title("Live Options Dashboard")
         # Add any other layout setup that isn't page config
         
         st.markdown(DashboardLayout._get_custom_css(), unsafe_allow_html=True)
@@ -59,8 +59,8 @@ class DashboardLayout:
             # Add vertical padding and width control in the same div
             st.markdown('<div style="padding-top: 28px; width: 125px;">', unsafe_allow_html=True)
             toggle_button = st.button(
-                "Pause" if st.session_state.initialized else "Start",
-                icon= "⏸️" if st.session_state.initialized else "🔥",
+                "Pause" if st.session_state.get('initialized', False) else "Start",
+                icon="⏸️" if st.session_state.get('initialized', False) else "🔥",
             )
             st.markdown('</div>', unsafe_allow_html=True)
 

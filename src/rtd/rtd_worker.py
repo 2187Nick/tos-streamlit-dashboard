@@ -20,7 +20,6 @@ class RTDWorker:
             if self.initialized:
                 print("Cleaning up previous instance...")
                 self.cleanup()
-                #time.sleep(.2)  # 1 Wait for proper cleanup
                 
             pythoncom.CoInitialize()
             time.sleep(0.1)  # Increased delay for COM initialization
@@ -45,6 +44,8 @@ class RTDWorker:
                             if self.client.subscribe(QuoteType.GAMMA, symbol):
                                 success_count += 1
                             if self.client.subscribe(QuoteType.OPEN_INT, symbol):
+                                success_count += 1
+                            if self.client.subscribe(QuoteType.DELTA, symbol):
                                 success_count += 1
                         else:
                             print(f"Subscribing to LAST for {symbol}")
