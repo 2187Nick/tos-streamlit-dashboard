@@ -203,7 +203,7 @@ class OptionSymbolBuilder:
         Regular weekly format:
         - Mon-Thu: E[week_indicator][weekday_code][month_code][year]
         - Friday: E[weekday_code][week_indicator][month_code][year]
-        - EOM: E[weekday_code][month_code][year]
+        - EOM: EW[month_code][year]
         """
         month_code = OptionSymbolBuilder.MONTH_TO_CODE.get(f"{expiry.month:02d}")
         year = str(expiry.year)[-2:]
@@ -219,7 +219,7 @@ class OptionSymbolBuilder:
         
         # Check if it's end of month
         if OptionSymbolBuilder._is_end_of_month(expiry):
-            return [f"E{weekday_code}{month_code}{year}"]
+            return [f"EW{month_code}{year}"]
         
         # Get week indicator for non-EOM dates
         week_indicator = OptionSymbolBuilder._get_week_indicator(expiry)

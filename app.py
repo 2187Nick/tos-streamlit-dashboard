@@ -8,6 +8,23 @@ from src.utils.option_symbol_builder import OptionSymbolBuilder
 from src.ui.gamma_chart import GammaChartBuilder
 from src.ui.dashboard_layout import DashboardLayout
 
+
+def _print_generated_symbols(base_symbol: str, expiry_date, price: float, option_symbols: list) -> None:
+    """Print generated symbols to the Streamlit terminal for manual verification."""
+    if not option_symbols:
+        print(f"No option symbols generated for {base_symbol}")
+        return
+
+    print("\n" + "=" * 80)
+    print(f"Generated option symbols for {base_symbol}")
+    print(f"Expiry: {expiry_date} | Price used: {price} | Count: {len(option_symbols)}")
+    print("-" * 80)
+
+    for index, option_symbol in enumerate(option_symbols, start=1):
+        print(f"{index:03d}: {option_symbol}")
+
+    print("=" * 80 + "\n")
+
 # Initialize session state
 if 'initialized' not in st.session_state:
     print("Initializing")
@@ -124,7 +141,8 @@ if st.session_state.initialized:
                         option_symbols = OptionSymbolBuilder.build_symbols(
                             symbol, expiry_date, price, strike_range, strike_spacing
                         )
-                        #print(f"Generated option symbols: {option_symbols[:2]}...")  # Debug first two symbols
+                        if symbol.startswith('/'):
+                            _print_generated_symbols(symbol, expiry_date, price, option_symbols)
                         
                         # Stop current thread
                         st.session_state.stop_event.set()
