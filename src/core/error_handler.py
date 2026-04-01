@@ -84,8 +84,12 @@ def validate_connection_state(expected_states: List[RTDConnectionState]):
                 if func.__name__ == 'heartbeat' and current_state == RTDConnectionState.DISCONNECTED:
                     logger.debug(f"Skipping heartbeat in {current_state} state")
                     return None
-                # Special case for Disconnect during shutdown
-                if func.__name__ == 'Disconnect' and current_state == RTDConnectionState.DISCONNECTING:
+                # Special case for Disconnect during or after shutdown
+                if func.__name__ == 'Disconnect' and current_state in {
+                    RTDConnectionState.DISCONNECTED,
+                    RTDConnectionState.DISCONNECTING,
+                }:
+                    logger.debug(f"Skipping Disconnect in {current_state} state")
                     return None  # Silently return for repeated Disconnect calls
                 # General case for disconnecting state
                 if current_state == RTDConnectionState.DISCONNECTING:

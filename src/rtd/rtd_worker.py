@@ -1,4 +1,5 @@
 # src/rtd/rtd_worker.py
+import gc
 import pythoncom
 import time
 import threading
@@ -9,14 +10,53 @@ from config.quote_types import QuoteType
 from src.utils.option_symbol_builder import OptionSymbolBuilder
 from src.core.logger import get_logger
 
+MAX_INIT_RETRIES = 3
+INIT_RETRY_DELAYS = [0.5, 1.0, 2.0]
+
 class RTDWorker:
     def __init__(self, data_queue: Queue, stop_event: threading.Event):
         self.data_queue = data_queue
         self.stop_event = stop_event
         self.client = None
         self.initialized = False
+        self._first_data_received = False
         self.logger = get_logger("RTDWorker")
         
+    def _init_com_with_retry(self):
+        """Initialize COM and RTD server with retry on failure."""
+        for attempt in range(MAX_INIT_RETRIES):
+            try:
+                pythoncom.CoInitialize()
+                time.sleep(0.1)
+                
+                self.client = RTDClient(heartbeat_ms=SETTINGS['timing']['initial_heartbeat'])
+                self.client.initialize()
+                self.initialized = True
+                return
+            except Exception as e:
+                self.logger.warning(
+                    f"COM init attempt {attempt + 1}/{MAX_INIT_RETRIES} failed: {e}"
+                )
+                # Aggressively clean up before retrying
+                if self.client:
+                    try:
+                        self.client.Disconnect()
+                    except Exception:
+                        pass
+                    self.client = None
+                try:
+                    pythoncom.CoUninitialize()
+                except Exception:
+                    pass
+                gc.collect()
+                
+                if attempt < MAX_INIT_RETRIES - 1:
+                    delay = INIT_RETRY_DELAYS[attempt]
+                    self.logger.info(f"Retrying COM init in {delay}s...")
+                    time.sleep(delay)
+                else:
+                    raise
+
     def start(self, all_symbols: list):
         """Start RTD worker with all symbols at once"""
         try:
@@ -24,12 +64,8 @@ class RTDWorker:
                 print("Cleaning up previous instance...")
                 self.cleanup()
                 
-            pythoncom.CoInitialize()
-            time.sleep(0.1)  # Increased delay for COM initialization
-            
-            self.client = RTDClient(heartbeat_ms=SETTINGS['timing']['initial_heartbeat'])
-            self.client.initialize()
-            self.initialized = True
+            self._first_data_received = False
+            self._init_com_with_retry()
             
             if not all_symbols:
                 print("No symbols provided!")
@@ -113,10 +149,18 @@ class RTDWorker:
                                 self.data_queue.put(current_data)
                                 last_data = current_data.copy()
                                 
+                                if not self._first_data_received:
+                                    self._first_data_received = True
+                                    self.logger.info("First data received - switching to normal poll rate")
+                                
                 except Exception as e:
                     self.logger.error(f"Data processing error: {str(e)}")
                 
-                time.sleep(1)
+                # Poll fast (50ms) until first data arrives, then slow to 1s
+                if self._first_data_received:
+                    time.sleep(1)
+                else:
+                    time.sleep(0.05)
 
         except Exception as e:
             error_msg = f"RTD Error: {str(e)}"
@@ -131,11 +175,14 @@ class RTDWorker:
             try:
                 print("Disconnecting RTDClient...")
                 self.client.Disconnect()
-                self.client = None
             except Exception as e:
                 print(f"Error during disconnect: {str(e)}")
+            finally:
+                self.client = None
         try:
             pythoncom.CoUninitialize()
         except Exception as e:
             print(f"Error during CoUninitialize: {str(e)}")
         self.initialized = False
+        self._first_data_received = False
+        gc.collect()

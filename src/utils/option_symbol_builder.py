@@ -110,9 +110,18 @@ class OptionSymbolBuilder:
 
     @staticmethod
     def _is_end_of_month(d: date) -> bool:
-        """Check if date is the last trading day of the month"""
-        next_day = d + timedelta(days=1)
-        return next_day.month != d.month
+        """Check if date is the last trading day of the month.
+        The last trading day is the last weekday (Mon-Fri) of the month.
+        """
+        # Find the last day of the month
+        if d.month == 12:
+            last_day = date(d.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            last_day = date(d.year, d.month + 1, 1) - timedelta(days=1)
+        # Walk backwards from last calendar day to find last weekday
+        while last_day.weekday() > 4:  # Saturday=5, Sunday=6
+            last_day -= timedelta(days=1)
+        return d == last_day
 
     @staticmethod
     def _is_quarterly_expiration(d: date) -> bool:
@@ -182,7 +191,7 @@ class OptionSymbolBuilder:
         if OptionSymbolBuilder._is_quarterly_expiration(expiry):
             print(f"Detected quarterly expiration for {expiry}")
             return ["NQ" + month_code + year,  # AM settled format
-                   f"QN + {week_indicator}{month_code}{year}"]   # Regular settled format
+                   f"QN{week_indicator}{month_code}{year}"]   # Regular settled format
         
         # Special handling for Friday (non-EOM)
         if expiry.weekday() == 4:  # Friday

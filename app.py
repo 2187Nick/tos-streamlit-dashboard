@@ -25,6 +25,24 @@ def _print_generated_symbols(base_symbol: str, expiry_date, price: float, option
 
     print("=" * 80 + "\n")
 
+
+def _extract_strike_from_option_symbol(option_symbol: str):
+    """Extract the numeric strike from an option symbol."""
+    symbol_without_exchange = option_symbol.split(':', 1)[0]
+    option_marker_index = max(
+        symbol_without_exchange.rfind('C'),
+        symbol_without_exchange.rfind('P')
+    )
+
+    if option_marker_index == -1:
+        raise ValueError(f"No call/put marker found in symbol: {option_symbol}")
+
+    strike_part = symbol_without_exchange[option_marker_index + 1:]
+    print(f"Extracted strike part from option symbol: {strike_part}")
+
+    strike = float(strike_part)
+    return int(strike) if strike.is_integer() else strike
+
 # Initialize session state
 if 'initialized' not in st.session_state:
     print("Initializing")
@@ -95,7 +113,7 @@ if start_stop_button:
             thread.start()
             st.session_state.active_thread = thread
             st.session_state.initialized = True
-            time.sleep(0.5)  # Give time for initial connection
+            time.sleep(0.1)  # Brief pause for connection setup
             st.rerun()
         except Exception as e:
             st.error(f"Failed to start RTD worker: {str(e)}")
@@ -164,7 +182,7 @@ if st.session_state.initialized:
                         )
                         thread.start()
                         st.session_state.active_thread = thread
-                        time.sleep(0.2)
+                        time.sleep(0.1)
                 
                 # Update chart
                 # Update chart
@@ -173,28 +191,16 @@ if st.session_state.initialized:
                     for sym in st.session_state.option_symbols:
                         try:
                             if sym.startswith('./'):  # Futures option symbol
-                                # Example: './E2AG25C6070:XCME' or './E2AG25P6070:XCME'
-                                parts = sym.split(':')[0]  # Remove exchange part first
-                                if 'C' in parts:
-                                    strike_part = parts.split('C')[1]
-                                else:
-                                    continue
-                                
-                                print(f"Extracted strike part from futures: {strike_part}")  # Debug log
-                                strike = float(strike_part)
-                                strikes.append(int(strike) if strike.is_integer() else strike)
+                                strikes.append(_extract_strike_from_option_symbol(sym))
                             else:  # Stock option symbol
-                                if 'C' in sym:
-                                    strike_part = sym.split('C')[1]
-                                    strike = float(strike_part)
-                                    strikes.append(int(strike) if strike.is_integer() else strike)
+                                strikes.append(_extract_strike_from_option_symbol(sym))
                                 
                         except (ValueError, IndexError) as e:
                             print(f"Error extracting strike from {sym}: {e}")
                             continue
                     
                     if strikes:
-                        strikes.sort()
+                        strikes = sorted(set(strikes))
                         print(f"Extracted strikes: {strikes[:5]}...")  # Debug log first 5 strikes
                         
                         # Always update chart if type changed or we don't have a figure
@@ -228,14 +234,15 @@ if st.session_state.initialized:
                         st.session_state.loading_complete = True
                     elif not force_update:  # Only sleep if not forced update
                         time.sleep(refresh_rate)
-
                     st.session_state.last_chart_type = chart_type
                     st.session_state.last_graph_type = graph_type  # Store last graph type
                     if st.session_state.initialized:
                         st.rerun()
         else:
             if st.session_state.initialized:
-                time.sleep(.5)
+                # Poll faster before first data loads, slower after
+                wait = 0.1 if not st.session_state.loading_complete else 0.5
+                time.sleep(wait)
                 st.rerun()
                 
     except Exception as e:

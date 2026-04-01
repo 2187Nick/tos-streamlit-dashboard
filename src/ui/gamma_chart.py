@@ -140,21 +140,15 @@ class GammaChartBuilder:
         Returns:
             Matching option symbol
         """
-        strike_str = str(int(float(strike))) if float(strike).is_integer() else str(float(strike))
+        strike_value = int(float(strike)) if float(strike).is_integer() else float(strike)
+        strike_str = str(strike_value)
         print(f"Looking for {option_type}{strike_str} in options")  # Debug logging
         
         try:
-            # First try exact match with exchange suffix
-            matched = [sym for sym in option_symbols if f'{option_type}{strike_str}:' in sym]
-            if matched:
-                #print(f"Found symbol with exchange: {matched[0]}")
-                return matched[0]
-            
-            # Try without exchange suffix and with different strike formats
-            matched = [sym for sym in option_symbols if f'{option_type}{strike_str}' in sym and ':' not in sym]
-            if matched:
-                #print(f"Found symbol without exchange: {matched[0]}")
-                return matched[0]
+            for sym in option_symbols:
+                parsed_option_type, parsed_strike = self._extract_option_type_and_strike(sym)
+                if parsed_option_type == option_type and parsed_strike == strike_value:
+                    return sym
             
             print(f"Available symbols: {option_symbols[:2]}...")  # Show first few symbols
             raise ValueError(f"No matching symbol found for {option_type}{strike_str}")
@@ -162,6 +156,22 @@ class GammaChartBuilder:
         except Exception as e:
             print(f"Error finding symbol for {option_type}{strike_str}: {e}")
             raise
+
+    def _extract_option_type_and_strike(self, option_symbol: str):
+        """Parse an option symbol and return its option type and numeric strike."""
+        symbol_without_exchange = option_symbol.split(':', 1)[0]
+        call_index = symbol_without_exchange.rfind('C')
+        put_index = symbol_without_exchange.rfind('P')
+        option_marker_index = max(call_index, put_index)
+
+        if option_marker_index == -1:
+            raise ValueError(f"No call/put marker found in symbol: {option_symbol}")
+
+        option_type = symbol_without_exchange[option_marker_index]
+        strike_part = symbol_without_exchange[option_marker_index + 1:]
+        strike = float(strike_part)
+        parsed_strike = int(strike) if strike.is_integer() else strike
+        return option_type, parsed_strike
 
     def _calculate_gex_values(self, data, strikes, option_symbols):
         pos_gex_values = []
